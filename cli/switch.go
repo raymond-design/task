@@ -37,7 +37,7 @@ func (s Switch) Switch() error {
 	name := os.Args[1]
 	cmd, ok := s.cmds[name]
 	if !ok {
-		return fmt.Errorf("Command %s not found", name)
+		return fmt.Errorf("command '%s' not found\n|", name)
 	}
 	return cmd()(name)
 }
