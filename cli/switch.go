@@ -1,11 +1,18 @@
 package cli
 
 import (
+	"flag"
 	"fmt"
 	"os"
+	"time"
 )
 
 type HttpClient interface {
+	Create(title, message string, duration time.Duration) ([]byte, error)
+	Edit(id, title, message string, duration time.Duration) ([]byte, error)
+	Fetch(ids []string) ([]byte, error)
+	Delete(ids []string) error
+	Healthy(host string) bool
 }
 
 type Switch struct {
@@ -55,7 +62,24 @@ func (s Switch) Help() {
 
 func (s Switch) create() func(string) error {
 	return func(cmd string) error {
-		fmt.Println("create")
+		createCmd := flag.NewFlagSet(cmd, flag.ExitOnError)
+		t, msg, dur := s.reminderFlags(createCmd)
+
+		if err := s.checkArgs(3); err != nil {
+			return err
+		}
+
+		if err := s.parseCmd(createCmd); err != nil {
+			return err
+		}
+
+		res, err := s.client.Create(*t, *msg, *dur)
+
+		if err != nil {
+			return wrapError("Could not creat task! Error:", err)
+		}
+
+		fmt.Printf("New Task Created!\n%s\n", string(res))
 		return nil
 	}
 }
@@ -86,4 +110,39 @@ func (s Switch) health() func(string) error {
 		fmt.Println("health")
 		return nil
 	}
+}
+
+/*
+* Reminder flags (Helper Function)
+ */
+func (s Switch) reminderFlags(f *flag.FlagSet) (*string, *string, *time.Duration) {
+	t, msg, dur := "", "", time.Duration(0)
+	f.StringVar(&t, "title", "", "Task Title")
+	f.StringVar(&t, "t", "", "Task Title")
+	f.StringVar(&msg, "message", "", "Task Message")
+	f.StringVar(&msg, "m", "", "Task Message")
+	f.StringVar(&msg, "duration", "", "Task Duration")
+	f.StringVar(&msg, "d", "", "Task Duration")
+	return &t, &msg, &dur
+}
+
+func (s Switch) parseCmd(cmd *flag.FlagSet) error {
+	err := cmd.Parse(os.Args[2:])
+	if err != nil {
+		return wrapError("error parsing command"+cmd.Name(), err)
+	}
+	return nil
+}
+
+func (s Switch) checkArgs(minArgs int) error {
+	if len(os.Args) == 3 && os.Args[2] == "--help" {
+		return nil
+	}
+
+	if len(os.Args)-2 < minArgs {
+		fmt.Printf("incorrect use of %s\n%s %s --help\n", os.Args[1], os.Args[0], os.Args[1])
+		return fmt.Errorf("%s expects at least %d arguments", os.Args[1], minArgs)
+	}
+
+	return nil
 }
