@@ -1,6 +1,9 @@
 package cli
 
-import "fmt"
+import (
+	"fmt"
+	"os"
+)
 
 type HttpClient interface {
 }
@@ -11,7 +14,7 @@ type Switch struct {
 	cmds   map[string]func() func(string) error
 }
 
-func createSwitch(uri string) Switch {
+func CreateSwitch(uri string) Switch {
 	httpClient := NewClient(uri)
 
 	switch1 := Switch{
@@ -28,6 +31,26 @@ func createSwitch(uri string) Switch {
 	}
 
 	return switch1
+}
+
+func (s Switch) Switch() error {
+	name := os.Args[1]
+	cmd, ok := s.cmds[name]
+	if !ok {
+		return fmt.Errorf("Command %s not found", name)
+	}
+	return cmd()(name)
+}
+
+/*
+* Prints out list of commands and their usages
+ */
+func (s Switch) Help() {
+	var help string
+	for name := range s.cmds {
+		help += name + "\t--help\n"
+	}
+	fmt.Printf("Usage: %s <command> [<args>]\n%s", os.Args[0], help)
 }
 
 func (s Switch) create() func(string) error {
