@@ -24,7 +24,7 @@ func main() {
 
 	err := s.Switch()
 	if err != nil {
-		fmt.Printf("error: %s", err)
+		fmt.Printf("error: %v\n", err)
 		os.Exit(2)
 	}
 }

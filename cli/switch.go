@@ -4,8 +4,20 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 )
+
+type idsFlag []string
+
+func (list idsFlag) String() string {
+	return strings.Join(list, ",")
+}
+
+func (list *idsFlag) Set(value string) error {
+	*list = append(*list, value)
+	return nil
+}
 
 type HttpClient interface {
 	Create(title, message string, duration time.Duration) ([]byte, error)
@@ -76,7 +88,7 @@ func (s Switch) create() func(string) error {
 		res, err := s.client.Create(*t, *msg, *dur)
 
 		if err != nil {
-			return wrapError("Could not creat task! Error:", err)
+			return wrapError("Could not create task! Error:", err)
 		}
 
 		fmt.Printf("New Task Created!\n%s\n", string(res))
@@ -85,29 +97,96 @@ func (s Switch) create() func(string) error {
 }
 
 func (s Switch) edit() func(string) error {
-	return func(args string) error {
-		fmt.Println("switch")
+	return func(cmd string) error {
+		ids := idsFlag{}
+		editCmd := flag.NewFlagSet(cmd, flag.ExitOnError)
+		editCmd.Var(&ids, "id", "Tasks to edit")
+
+		t, msg, dur := s.reminderFlags(editCmd)
+
+		if err := s.checkArgs(2); err != nil {
+			return err
+		}
+
+		if err := s.parseCmd(editCmd); err != nil {
+			return err
+		}
+
+		lastID := ids[len(ids)-1]
+
+		res, err := s.client.Edit(lastID, *t, *msg, *dur)
+
+		if err != nil {
+			return wrapError("Could not edit task! Error:", err)
+		}
+
+		fmt.Printf("Task edited succesfully!\n%s\n", string(res))
 		return nil
 	}
 }
 
 func (s Switch) fetch() func(string) error {
-	return func(args string) error {
-		fmt.Println("fetch")
+	return func(cmd string) error {
+		ids := idsFlag{}
+		fetchCmd := flag.NewFlagSet(cmd, flag.ExitOnError)
+		fetchCmd.Var(&ids, "id", "Tasks to fetch")
+
+		if err := s.checkArgs(1); err != nil {
+			return err
+		}
+
+		if err := s.parseCmd(fetchCmd); err != nil {
+			return err
+		}
+
+		res, err := s.client.Fetch(ids)
+
+		if err != nil {
+			return wrapError("Could not fetch task! Error:", err)
+		}
+
+		fmt.Printf("Task fetched succesfully!\n%s\n", string(res))
 		return nil
 	}
 }
 
 func (s Switch) delete() func(string) error {
-	return func(args string) error {
-		fmt.Println("delete")
+	return func(cmd string) error {
+		ids := idsFlag{}
+		deleteCmd := flag.NewFlagSet(cmd, flag.ExitOnError)
+		deleteCmd.Var(&ids, "id", "Ids of tasks to delete")
+
+		if err := s.checkArgs(1); err != nil {
+			return err
+		}
+
+		err := s.client.Delete(ids)
+
+		if err != nil {
+			return wrapError("Could not delete task! Error:", err)
+		}
+
+		fmt.Printf("Task deleted succesfully!\n%v\n", ids)
 		return nil
 	}
 }
 
 func (s Switch) health() func(string) error {
-	return func(args string) error {
-		fmt.Println("health")
+	return func(cmd string) error {
+		var host string
+		healthCmd := flag.NewFlagSet(cmd, flag.ExitOnError)
+		healthCmd.StringVar(&host, "host", s.api, "Host to check health of")
+
+		if err := s.parseCmd(healthCmd); err != nil {
+			return err
+		}
+
+		if !s.client.Healthy(host) {
+			fmt.Printf("Host %s is not healthy!\n", host)
+		} else {
+			fmt.Printf("Host %s is healthy!\n", host)
+		}
+
 		return nil
 	}
 }
@@ -121,8 +200,8 @@ func (s Switch) reminderFlags(f *flag.FlagSet) (*string, *string, *time.Duration
 	f.StringVar(&t, "t", "", "Task Title")
 	f.StringVar(&msg, "message", "", "Task Message")
 	f.StringVar(&msg, "m", "", "Task Message")
-	f.StringVar(&msg, "duration", "", "Task Duration")
-	f.StringVar(&msg, "d", "", "Task Duration")
+	f.DurationVar(&dur, "duration", 0, "Task Duration")
+	f.DurationVar(&dur, "d", 0, "Task Duration")
 	return &t, &msg, &dur
 }
 
