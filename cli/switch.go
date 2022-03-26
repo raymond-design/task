@@ -34,7 +34,7 @@ type Switch struct {
 }
 
 func CreateSwitch(uri string) Switch {
-	httpClient := NewClient(uri)
+	httpClient := NewHTTPClient(uri)
 
 	switch1 := Switch{
 		client: httpClient,
